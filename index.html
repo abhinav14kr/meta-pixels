@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+
+    
+    
+    
+</head>
+
+    <form id="form">
+        
+        <input type="text" id="name" placeholder="Enter your name" required>
+        
+        <input type="email" id="email" placeholder="Enter your email" required>
+        
+        <input type="tel" id="phone" placeholder="Enter your phone">
+        <button type="button" id="cartBtn">Add to Cart</button>
+        <button type="button" id="wishBtn" style="background:#42b72a">Add to Wishlist</button>
+    </form>
+    <div class="log" id="log">[Ready] Waiting for events...</div>
+    ';
+            el.scrollTop = el.scrollHeight;
+        }
+        
+        function getCookie(n) {
+            var v = '; ' + document.cookie;
+            var p = v.split('; ' + n + '=');
+            return p.length === 2 ? p.pop().split(';').shift() : null;
+        }
+        
+        async function sendEvent(eventName) {
+            var name = document.getElementById('name').value;
+            var email = document.getElementById('email').value;
+            var phone = document.getElementById('phone').value;
+            if (!name || !email) { alert('Enter name and email'); return; }
+            
+            var names = name.trim().split(' ');
+            var eventId = eventName + '_' + Date.now() + '_' + Math.random().toString(36).substr(2,9);
+            var eventData = { content_name: 'Test Product', content_ids: ['1234'], content_type: 'product', value: 50, currency: 'USD' };
+            
+            log('=== ' + eventName + ' ===', 'info');
+            log('Event ID: ' + eventId, 'info');
+            
+            fbq('track', eventName, eventData, { eventID: eventId });
+            log('PIXEL: Sent to Facebook', 'pixel');
+            
+            try {
+                var res = await fetch(CAPI_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        eventName: eventName,
+                        eventId: eventId,
+                        eventData: eventData,
+                        userData: { email: email, phone: phone, firstName: names[0], lastName: names.slice(1).join(' '), fbc: getCookie('_fbc'), fbp: getCookie('_fbp') },
+                        eventSourceUrl: window.location.href,
+                        clientUserAgent: navigator.userAgent
+                    })
+                });
+                var data = await res.json();
+                if (data.success) {
+                    log('CAPI: Success - events_received: ' + (data.result.events_received || 1), 'success');
+                } else {
+                    log('CAPI: Failed - ' + JSON.stringify(data.error), 'capi');
+                }
+            } catch (e) {
+                log('CAPI Error: ' + e.message, 'capi');
+            }
+            log('Both events sent with same ID for deduplication', 'success');
+        }
+        
+        document.getElementById('cartBtn').onclick = function() { sendEvent('AddToCart'); };
+        document.getElementById('wishBtn').onclick = function() { sendEvent('AddToWishlist'); };
+    </script>
+</body>
+</html>
